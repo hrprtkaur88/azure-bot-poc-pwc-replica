@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: azure-bot
+  namespace: azure-bot
+spec:
+  type: LoadBalancer
+  selector:
+    app: azure-bot
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3978

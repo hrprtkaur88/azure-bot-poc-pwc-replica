@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: azure-bot
+  namespace: azure-bot
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    # Matches the architecture diagram: ingress path /messaging, no rewrite.
+spec:
+  rules:
+    - host: <public-bot-host>
+      http:
+        paths:
+          - path: /messaging
+            pathType: Prefix
+            backend:
+              service:
+                name: azure-bot
+                port:
+                  number: 80

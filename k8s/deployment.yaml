@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azure-bot
+  namespace: azure-bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azure-bot
+  template:
+    metadata:
+      labels:
+        app: azure-bot
+        # Required for the Azure Workload Identity mutating webhook to inject
+        # AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_FEDERATED_TOKEN_FILE /
+        # AZURE_AUTHORITY_HOST into this pod automatically.
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: azure-bot-workload-identity
+      containers:
+        - name: azure-bot
+          image: <acr-login-server>/azure-bot:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3978
+          envFrom:
+            - configMapRef:
+                name: azure-bot-config
+          env:
+            # NOTE: Phase 1 deliberately does NOT set AZURE_BOT_CLIENT_ID /
+            # AZURE_BOT_TENANT_ID here. The app code (src/agent.ts) reads
+            # those specific names, but AKS's workload identity webhook only
+            # injects AZURE_CLIENT_ID / AZURE_TENANT_ID (different names).
+            # This configuration intentionally tests whether that naming gap
+            # causes a real failure. See scripts/apply-client-id-fix.ps1 for
+            # the corrected Phase 2 configuration.
+            - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: azure-bot-secrets
+                  key: APPLICATIONINSIGHTS_CONNECTION_STRING
+                  optional: true
+          readinessProbe:
+            httpGet:
+              path: /messaging/healthz
+              port: 3978
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /messaging/healthz
+              port: 3978
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: azure-bot-config
+  namespace: azure-bot
+data:
+  ENABLE_AZURE_BOT_FEDERATED_IDENTITY: "true"
+  LOG_LEVEL: "debug"
+  DEBUG: "agents:*"
+  PORT: "3978"

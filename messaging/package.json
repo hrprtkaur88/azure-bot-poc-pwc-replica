@@ -1,0 +1,23 @@
+{
+  "name": "azure-bot",
+  "version": "0.1.0",
+  "description": "Azure Bot Service messaging endpoint for Conversation Intelligence (Microsoft 365 Agents SDK)",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc --build --clean && tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.test.json && AZURE_BOT_CLIENT_ID=bot-app-client-id AZURE_BOT_TENANT_ID=tenant-id AZURE_BOT_CLIENT_SECRET=bot-app-client-secret node --test .test-dist/test/*.test.js",
+    "prestart": "npm run build",
+    "start": "node ./dist/index.js",
+    "start:dev": "NODE_OPTIONS=\"--experimental-specifier-resolution=node\" ts-node-dev --transpile-only --respawn --poll --project tsconfig.json src/index.ts"
+  },
+  "dependencies": {
+    "@microsoft/agents-hosting": "^1.6.1",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.6.0"
+  }
+}

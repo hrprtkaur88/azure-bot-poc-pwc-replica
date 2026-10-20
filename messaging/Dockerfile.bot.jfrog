@@ -1,0 +1,79 @@
+# Check out https://hub.docker.com/_/node to select a new base image
+##### Base #####
+FROM w00014-pwc-us-digital-devops-docker.artifacts-west.pwc.com/w00014-pwc-us-digital-devops-docker/digital/node:24-slim AS base
+
+ARG NODE_APP_PORT=3978
+ENV NODE_APP_PORT=$NODE_APP_PORT
+ENV NODE_OPTIONS="--experimental-specifier-resolution=node"
+
+WORKDIR /home/node/app
+
+USER root
+
+# Install runtime HTTPS, native dependency, and network diagnostic tooling
+RUN apt-get update -y \
+    && apt-get install -y --no-install-recommends openssl ca-certificates netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Trust corporate root certificates (before any HTTPS calls)
+COPY --chown=root:root certificates/ /usr/local/share/ca-certificates/
+RUN update-ca-certificates
+
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+    REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+    NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+
+##### Dependencies (full, incl. devDependencies) #####
+FROM base AS deps
+
+COPY --chown=node package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps
+
+##### Builder #####
+FROM base AS builder
+
+COPY --chown=node package.json package-lock.json ./
+COPY --from=deps /home/node/app/node_modules ./node_modules
+COPY --chown=node . .
+
+ENV NODE_ENV=production
+RUN npm run build
+
+# Drop devDependencies so only runtime deps carry into the production image
+RUN npm prune --omit=dev --legacy-peer-deps
+
+##### Development #####
+# Used by docker-compose (target: development): source + node_modules are
+# volume-mounted at runtime and the container runs `npm run start:dev`.
+FROM base AS development
+
+ENV NODE_ENV=development \
+    HOST=0.0.0.0 \
+    PORT=${NODE_APP_PORT}
+
+COPY --chown=node package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps
+
+COPY --chown=node . .
+
+ENV PATH=/home/node/app/node_modules/.bin:$PATH
+
+USER node
+EXPOSE ${NODE_APP_PORT}
+CMD ["npm", "run", "start:dev"]
+
+##### Production #####
+FROM base AS production
+
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=${NODE_APP_PORT}
+
+# Compiled output and pruned production node_modules only
+COPY --from=builder --chown=node /home/node/app/package.json ./package.json
+COPY --from=builder --chown=node /home/node/app/node_modules ./node_modules
+COPY --from=builder --chown=node /home/node/app/dist ./dist
+
+USER node
+EXPOSE ${NODE_APP_PORT}
+CMD ["node", "dist/index.js"]

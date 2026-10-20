@@ -9,4 +9,9 @@ if (-not $acrName) {
   throw "No Azure Container Registry found in $ResourceGroupName."
 }
 
-az acr build -r $acrName -t azure-bot:latest -f Dockerfile.bot .\messaging
+Push-Location .\messaging
+try {
+  az acr build -r $acrName -t azure-bot:latest -f Dockerfile.bot --target production .
+} finally {
+  Pop-Location
+}
